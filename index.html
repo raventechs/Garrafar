@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════
+  EMPRESAR (ex GarrafAR) — v1.1
+  Fecha de esta versión: 2026-06-27
+  Cambios respecto a v1.0: 1) reemplazada la configuración de
+  Firebase de placeholder ("REEMPLAZAR") por la real del proyecto
+  empresar-ec7b7. 2) Corregido bug que dejaba la pantalla de carga
+  inicial tapando todo para siempre — su CSS la mostraba siempre,
+  sin estar atada al sistema de cambio de pantallas; ahora
+  showScreen() la oculta explícitamente la primera vez que se
+  muestra cualquier otra pantalla.
+  PENDIENTE: crear los índices compuestos de Firestore (ver bloque
+  de reglas documentado al final del archivo).
+  ════════════════════════════════════════════════════════════
+-->
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -478,7 +493,7 @@ function toast(msg,type=''){
 function emptyHTML(icon,msg,sub=''){return`<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-msg">${msg}</div>${sub?`<div class="empty-sub">${sub}</div>`:''}</div>`;}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function showScreen(id){document.getElementById('loading-screen').style.display='none';document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function fmtFecha(f){if(!f)return'—';const[y,m,d]=f.split('-');return`${d}/${m}/${y}`;}
 function fmtARS(n){return'$'+(n||0).toLocaleString('es-AR');}
 function uid(){return Math.random().toString(36).substring(2,10);}
