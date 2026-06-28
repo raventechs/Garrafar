@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <!--
   ════════════════════════════════════════════════════════════
-  EMPRESAR (ex GarrafAR) — v1.1
+  EMPRESAR (ex GarrafAR) — v1.2
   Fecha de esta versión: 2026-06-27
-  Cambios respecto a v1.0: 1) reemplazada la configuración de
-  Firebase de placeholder ("REEMPLAZAR") por la real del proyecto
-  empresar-ec7b7. 2) Corregido bug que dejaba la pantalla de carga
-  inicial tapando todo para siempre — su CSS la mostraba siempre,
-  sin estar atada al sistema de cambio de pantallas; ahora
-  showScreen() la oculta explícitamente la primera vez que se
-  muestra cualquier otra pantalla.
+  Cambios respecto a v1.1: agregado login con Google (botón
+  "Ingresar con Google") junto al de email/contraseña. Funciona
+  con la misma lógica ya existente — el primer usuario que entra
+  (sea por Google o por email) se crea automáticamente como
+  central (owner), sin pasos adicionales.
   PENDIENTE: crear los índices compuestos de Firestore (ver bloque
-  de reglas documentado al final del archivo).
+  de reglas documentado al final del archivo). También: habilitar
+  "Google" como proveedor en Firebase Console → Authentication →
+  Sign-in method, si todavía no está activado (además del de
+  Email/contraseña que ya debería estar).
   ════════════════════════════════════════════════════════════
 -->
 <html lang="es">
@@ -259,6 +260,13 @@ button,input,select,textarea{font-family:var(--font)}
     <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="tu@email.com"/></div>
     <div class="field"><label>Contraseña</label><input id="f-pass" type="password" placeholder="••••••••"/></div>
     <button class="btn-primary" id="btn-auth">Ingresar →</button>
+    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:rgba(255,255,255,.4);font-size:12px;">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.15)"></div>O<div style="flex:1;height:1px;background:rgba(255,255,255,.15)"></div>
+    </div>
+    <button class="btn-primary" id="btn-google" style="background:#fff;color:#1f1f1f;display:flex;align-items:center;justify-content:center;gap:10px">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14-5.6l-6.5-5.3c-2 1.4-4.6 2.3-7.5 2.3-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.5 5.3C41.4 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+      Ingresar con Google
+    </button>
   </div>
 </div>
 
@@ -463,7 +471,7 @@ button,input,select,textarea{font-family:var(--font)}
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence,GoogleAuthProvider,signInWithPopup}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,addDoc,getDocs,getDoc,updateDoc,deleteDoc,setDoc,query,where,serverTimestamp,Timestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FB={
@@ -563,6 +571,17 @@ document.getElementById('btn-auth').addEventListener('click',async()=>{
     const msgs={'auth/user-not-found':'No existe cuenta con ese email.','auth/wrong-password':'Contraseña incorrecta.','auth/invalid-credential':'Email o contraseña incorrectos.'};
     errEl.textContent=msgs[e.code]||'Error. Intentá de nuevo.';errEl.classList.add('show');
     btn.disabled=false;btn.textContent='Ingresar →';
+  }
+});
+document.getElementById('btn-google').addEventListener('click',async()=>{
+  const errEl=document.getElementById('auth-err');
+  errEl.classList.remove('show');
+  const btn=document.getElementById('btn-google');btn.disabled=true;
+  try{
+    await signInWithPopup(auth,new GoogleAuthProvider());
+  }catch(e){
+    errEl.textContent='No se pudo ingresar con Google. Intentá de nuevo.';errEl.classList.add('show');
+    btn.disabled=false;
   }
 });
 document.getElementById('btn-logout').addEventListener('click',()=>signOut(auth));
