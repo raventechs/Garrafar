@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ════════════════════════════════════════════════════════════
-  EMPRESAR (ex GarrafAR) — v1.2
+  EMPRESAR (ex EmpresAR) — v1.2
   Fecha de esta versión: 2026-06-27
   Cambios respecto a v1.1: agregado login con Google (botón
   "Ingresar con Google") junto al de email/contraseña. Funciona
@@ -24,8 +24,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GarrafAR">
-<title>GarrafAR — Gestión de documentación</title>
+<meta name="apple-mobile-web-app-title" content="EmpresAR">
+<title>EmpresAR — Gestión de sucursales</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -47,7 +47,7 @@
   --border:#334155;--text:#f1f5f9;--muted:#94a3b8;
   --green-bg:#052e16;--red-bg:#3f0f0f;--warn-bg:#1c1000;--blue-bg:#0c2a5e;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden}*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;transition:background .2s,color .2s}
 button,input,select,textarea{font-family:var(--font)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -243,7 +243,7 @@ button,input,select,textarea{font-family:var(--font)}
         <path d="M24 16c1 4-4 5-4 10a4 4 0 0 0 8 0c0-2-1.5-3-1.5-5 1.5 1 2.5 3 2.5 5a5 5 0 0 1-10 0c0-4 4-6 5-10z" fill="#fff"/>
       </svg>
     </div>
-    <div class="ld-title">Garraf<span style="color:#f0b84a">AR</span></div>
+    <div class="ld-title">Empres<span style="color:#f0b84a">AR</span></div>
     <div class="ld-sub">Cargando documentación...</div>
   </div>
 </div>
@@ -445,8 +445,8 @@ button,input,select,textarea{font-family:var(--font)}
   <div class="demo-card">
     <div class="demo-icon">⏳</div>
     <div class="demo-title">Tu demo terminó</div>
-    <div class="demo-sub">Gracias por probar GarrafAR. Para activar tu cuenta, contactanos.</div>
-    <a href="mailto:ventas@raventechsapp.com?subject=Quiero activar GarrafAR&body=Hola, probé la demo y me interesa continuar." class="btn-demo-email">✉️ Contactar por email</a>
+    <div class="demo-sub">Gracias por probar EmpresAR. Para activar tu cuenta, contactanos.</div>
+    <a href="mailto:ventas@raventechsapp.com?subject=Quiero activar EmpresAR&body=Hola, probé la demo y me interesa continuar." class="btn-demo-email">✉️ Contactar por email</a>
     <button class="btn-demo-logout" id="btn-demo-logout">Cerrar sesión</button>
   </div>
 </div>
@@ -482,14 +482,28 @@ const FB={
   messagingSenderId:"430964335300",
   appId:"1:430964335300:web:c491efebbcd98379dc1f91"
 };
-const ADMIN_PIN="1990";
+const ADMIN_PIN="2580";
 const DEMO_MS=24*60*60*1000;
 const ALERTA_DIAS=30; // avisa con esta anticipación
 
 const fbApp=initializeApp(FB);
 const auth=getAuth(fbApp);
 const db=getFirestore(fbApp);
-let authReady=setPersistence(auth,browserLocalPersistence).catch(()=>{});
+
+// LOG DE ERRORES — P5 ROBUSTEZ
+async function logError(origen, mensaje, extra) {
+  try {
+    const u = auth.currentUser ? auth.currentUser.uid : 'anonimo';
+    await addDoc(collection(db,'errores'), {
+      app: 'EmpresAR', origen,
+      mensaje: String(mensaje),
+      extra: extra ? String(extra) : null,
+      uid: u,
+      ts: serverTimestamp()
+    });
+  } catch(_) {}
+}
+let authReady=setPersistence(auth,browserLocalPersistence).catch(e => logError('catch', e));
 
 function sanitizeHTML(str){const d=document.createElement('div');d.textContent=str??"";return d.innerHTML;}
 function toast(msg,type=''){
@@ -1193,6 +1207,7 @@ function renderVentas(){
         <div class="kpi-card"><div class="kpi-top"><span class="kpi-icon">💰</span></div><div class="kpi-value">${fmtARS(totalHoy)}</div><div class="kpi-label">Total vendido hoy</div></div>
       </div>
       <div class="sec-header"><span class="sec-title">Ventas de hoy</span><button class="btn navy" id="btn-nueva-venta">＋ Nueva venta</button></div>
+      <button onclick="exportarCSV()" style="background:#f0b84a;color:#0f1e3d;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;width:100%">⬇️ Exportar ventas CSV</button>
       ${renderVentasListHTML(ventasHoy)}`;
     el.querySelector('#btn-nueva-venta').addEventListener('click',()=>openVentaModal());
   } else {
@@ -1307,10 +1322,32 @@ document.getElementById('save-venta').addEventListener('click',async()=>{
   }catch(e){toast('Error al guardar la venta','err');}
   btn.disabled=false;btn.textContent='Guardar venta';
 });
+
+// EXPORTAR CSV — P2 ROBUSTEZ
+async function exportarCSV() {
+  try {
+    const u = uid();
+    if (!u) { toast('Iniciá sesión para exportar','warn'); return; }
+    const snap = await getDocs(query(collection(db,'ventas'), where('ownerUid','==',u), orderBy('fecha','desc')));
+    const rows = [['Fecha','Sucursal','Cliente','Producto','Cantidad','Total','Notas']];
+    snap.forEach(d => {
+      const v = d.data();
+      const fecha = v.fecha ? new Date(v.fecha.seconds*1000).toLocaleDateString('es-AR') : '';
+      rows.push([fecha, (v.sucursalNombre||'').replace(/"/g,"'"), (v.clienteNombre||'').replace(/"/g,"'"),
+        (v.producto||'').replace(/"/g,"'"), v.cantidad||'', v.total||0, (v.notas||'').replace(/"/g,"'")]);
+    });
+    const csv = rows.map(r => r.map(x => `"${x}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'empresar-ventas-' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+    toast('CSV exportado');
+  } catch(e) { logError('exportCSV', e); }
+}
 </script>
 
 <!--
-FIRESTORE SECURITY RULES — GarrafAR
+FIRESTORE SECURITY RULES — EmpresAR
 
 rules_version = '2';
 service cloud.firestore {
@@ -1406,5 +1443,12 @@ NOTAS PARA RUBÉN:
   ni la central pueden editarlas o borrarlas después de guardadas (mismo rigor que
   el historial de ventas de PuntoVenta, pero acá sin posibilidad de corrección).
 -->
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/Garrafar/sw-empresar.js')
+      .catch(e => console.warn('SW:', e));
+  }
+</script>
 </body>
 </html>
