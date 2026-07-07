@@ -472,7 +472,7 @@ button,input,select,textarea{font-family:var(--font)}
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence,GoogleAuthProvider,signInWithPopup}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import{getFirestore,collection,doc,addDoc,getDocs,getDoc,updateDoc,deleteDoc,setDoc,query,where,serverTimestamp,Timestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import{getFirestore,collection,doc,addDoc,getDocs,getDoc,updateDoc,deleteDoc,setDoc,query,where,serverTimestamp,Timestamp,onSnapshot}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FB={
   apiKey:"AIzaSyAyE0thmyNrq5gFdUdeoJdJvMHBEyezu1w",
@@ -634,6 +634,19 @@ onAuthStateChanged(auth,async user=>{
     await loadData();
     renderPage('dashboard');
     checkDemo();
+
+    // Escuchar cambios en tiempo real del userDoc
+    // Así cuando el admin activa la cuenta, el demo-wall desaparece sin recargar
+    onSnapshot(doc(db,'usuarios',user.uid), (snap) => {
+      if (snap.exists()) {
+        userDoc = snap.data();
+        if (userDoc.status === 'activo') {
+          document.getElementById('demo-wall').classList.remove('open');
+        } else {
+          checkDemo();
+        }
+      }
+    });
   } else {
     me=null;userDoc=null;sucursales=[];documentos=[];cierresStock=[];clientes=[];ventas=[];
     document.getElementById('demo-wall').classList.remove('open');
