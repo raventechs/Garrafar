@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!--
   ════════════════════════════════════════════════════════════
-  EMPRESAR (ex EmpresAR) — v1.2
-  Fecha de esta versión: 2026-06-27
+  EMPRESAR (ex EmpresAR) — v1.4
+  Fecha de esta versión: 2026-07-07
   Cambios respecto a v1.1: agregado login con Google (botón
   "Ingresar con Google") junto al de email/contraseña. Funciona
   con la misma lógica ya existente — el primer usuario que entra
@@ -633,11 +633,11 @@ onAuthStateChanged(auth,async user=>{
     showScreen('screen-app');
     await loadData();
     renderPage('dashboard');
-    checkDemo();
 
-    // Escuchar cambios en tiempo real del userDoc
-    // Así cuando el admin activa la cuenta, el demo-wall desaparece sin recargar
-    onSnapshot(doc(db,'usuarios',user.uid), (snap) => {
+    // onSnapshot reemplaza checkDemo() — es la fuente de verdad del estado demo
+    // Se guarda el unsubscribe para cancelarlo al hacer logout y evitar acumulación de listeners
+    if (window._unsubUserDoc) window._unsubUserDoc();
+    window._unsubUserDoc = onSnapshot(doc(db,'usuarios',user.uid), (snap) => {
       if (snap.exists()) {
         userDoc = snap.data();
         if (userDoc.status === 'activo') {
@@ -648,6 +648,7 @@ onAuthStateChanged(auth,async user=>{
       }
     });
   } else {
+    if (window._unsubUserDoc) { window._unsubUserDoc(); window._unsubUserDoc = null; }
     me=null;userDoc=null;sucursales=[];documentos=[];cierresStock=[];clientes=[];ventas=[];
     document.getElementById('demo-wall').classList.remove('open');
     showScreen('screen-login');
