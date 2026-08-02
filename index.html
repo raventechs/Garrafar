@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════
-   EmpresAR v2.0 — Gestión de Documentación
+   EmpresAR v2.1 — Gestión de Documentación — 2026-08-01 — Seguridad: sanitizar() anti-XSS, App Check SDK preparado
    RavenTechs 2026
 ═══════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -392,6 +392,7 @@ button[class*="metodo"]:active, button[class*="pago"]:active {
 //  RavenTechs 2026 — Firebase: empresar-ec7b7
 // ═══════════════════════════════════════════
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
                            from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, getDocs, getDoc, updateDoc,
@@ -408,6 +409,18 @@ const app  = initializeApp({
 });
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const APPCHECK_KEY = "";
+if (APPCHECK_KEY) {
+  initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APPCHECK_KEY), isTokenAutoRefreshEnabled: true });
+}
+function sanitizar(txt) {
+  return String(txt || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 window.auth = auth;
 
 // ── ESTADO ──
@@ -497,8 +510,8 @@ function renderDocs() {
     return `<div class="doc-card ${est.estado}" onclick="editarDoc('${d.id}')">
       <div class="doc-icon" style="background:${cat.bg}">${cat.emoji}</div>
       <div class="doc-info">
-        <div class="doc-nombre">${d.nombre}</div>
-        <div class="doc-categoria">${cat.label}${d.responsable ? ' · ' + d.responsable : ''}</div>
+        <div class="doc-nombre">${sanitizar(d.nombre)}</div>
+        <div class="doc-categoria">${cat.label}${d.responsable ? ' · ' + sanitizar(d.responsable) : ''}</div>
         <div class="doc-vencimiento ${est.clase}">${est.label}</div>
       </div>
       <span class="doc-badge badge-${est.clase}">${est.estado === 'vencido' ? '⛔' : est.estado === 'por-vencer' ? '⚠️' : '✅'}</span>
@@ -529,7 +542,7 @@ function renderDashboard() {
     return `<div class="doc-card ${est.estado}" onclick="editarDoc('${d.id}');navTo('docs',document.querySelector('[data-page=docs]'))">
       <div class="doc-icon" style="background:${cat.bg}">${cat.emoji}</div>
       <div class="doc-info">
-        <div class="doc-nombre">${d.nombre}</div>
+        <div class="doc-nombre">${sanitizar(d.nombre)}</div>
         <div class="doc-categoria">${cat.label}</div>
         <div class="doc-vencimiento ${est.clase}">${est.label}</div>
       </div>
