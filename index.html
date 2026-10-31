@@ -501,6 +501,13 @@ var __rtPWA = (function() {
       <div style="font-size:0.78rem;color:var(--muted)" id="ajustesEmail">—</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
+      <div style="font-weight:600;margin-bottom:4px;font-size:0.88rem">🎓 Modo Práctica</div>
+      <div style="font-size:0.74rem;color:var(--muted);margin-bottom:10px">Carga documentos de ejemplo (vencidos, por vencer y vigentes) para aprender o mostrar la app. Quedan marcados y se quitan con un botón; tus documentos reales no se tocan.</div>
+      <button class="btn-primary" onclick="cargarPractica()" style="margin-bottom:8px">🎓 Cargar datos de práctica</button>
+      <button class="btn-secondary" onclick="quitarPractica()">🧹 Quitar datos de práctica</button>
+      <div id="practicaMsg" style="font-size:0.74rem;color:var(--muted);margin-top:8px"></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="font-weight:600;margin-bottom:12px;font-size:0.88rem">Backup de datos</div>
       <button class="btn-primary" onclick="generarBackup(false)" style="margin-bottom:8px">⬇️ Descargar backup</button>
       <button class="btn-secondary" onclick="document.getElementById('inputRestore').click()">⬆️ Restaurar backup</button>
@@ -908,6 +915,39 @@ function chequearBackupDiario() {
   if (ultimo !== _bkHoy()) setTimeout(function () { generarBackup(true); }, 5000);
 }
 window.generarBackup = generarBackup; window.restaurarBackup = restaurarBackup;
+// ── MODO PRÁCTICA: documentos de ejemplo marcados _demo:true (ids demo_*). Nunca toca documentos reales. ──
+function _pdia(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+window.cargarPractica = async function() {
+  const M=document.getElementById('practicaMsg');
+  try {
+    const ej=[
+      ['VTV camioneta Hilux','vehiculos',-12,15,'Turnos en planta Ruta 8','Juan Pérez'],
+      ['Seguro flota (póliza)','vehiculos',9,15,'Renovar con la aseguradora','Administración'],
+      ['Licencia de conducir - Carlos','personal',25,30,'Categoría profesional D1','Carlos Gómez'],
+      ['Apto médico - Laura','personal',70,30,'Examen anual','Laura Díaz'],
+      ['Habilitación municipal','habilitaciones',-3,30,'Renovación anual en municipalidad','Dueño'],
+      ['Libro de inspección','habilitaciones',140,30,'','Dueño'],
+      ['Matafuegos (recarga)','instalaciones',5,15,'Revisión por empresa habilitada','Mantenimiento'],
+      ['Certificado de bomberos','instalaciones',210,60,'','Mantenimiento'],
+      ['Contrato de alquiler','empresa',320,60,'Cláusula de ajuste semestral','Dueño'],
+      ['ART (renovación)','empresa',45,30,'Nómina actualizada','Administración'],
+      ['Habilitación proveedor transporte','proveedores',18,15,'Pedir copia actualizada','Compras'],
+      ['Seguro de caución','otros',95,30,'','Administración']];
+    for (let i=0;i<ej.length;i++){ const e=ej[i];
+      await setDoc(doc(db,'usuarios',me.uid,'documentos','demo_'+i),{nombre:e[0],categoria:e[1],vencimiento:_pdia(e[2]),alertaDias:e[3],notas:e[4],responsable:e[5],_demo:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}); }
+    if(M)M.textContent='✅ '+ej.length+' documentos de práctica cargados.'; toast('Datos de práctica cargados');
+  } catch(e){ logError('cargarPractica',e.message); toast('Error al cargar práctica','danger'); }
+};
+window.quitarPractica = async function() {
+  if(!confirm('¿Quitar los documentos de práctica? Tus documentos reales no se tocan.'))return;
+  const M=document.getElementById('practicaMsg');
+  try {
+    const snap=await getDocs(collection(db,'usuarios',me.uid,'documentos')); let n=0;
+    for (const d of snap.docs){ if(d.data()._demo===true){ await deleteDoc(d.ref); n++; } }
+    if(M)M.textContent='🧹 '+n+' documentos de práctica quitados.'; toast('Datos de práctica quitados');
+  } catch(e){ logError('quitarPractica',e.message); toast('Error al quitar práctica','danger'); }
+};
+
 // ══════════ FIN BACKUP ══════════
 
 // ── P1: PIN ADMIN (5 toques en logo) ──
