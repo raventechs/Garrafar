@@ -360,14 +360,13 @@ var __rtPWA = (function() {
 <!-- TOAST -->
 <div id="toast"></div>
 
-<!-- PIN MODAL -->
+<!-- ADMIN MODAL (sin PIN: solo cuenta admin) -->
 <div id="pinModal">
-  <div class="pin-box">
-    <div class="pin-title">🔐 Panel Admin RavenTechs</div>
-    <input type="password" id="pinInput" class="pin-input" placeholder="····" maxlength="4" inputmode="numeric">
-    <div class="pin-error" id="pinError"></div>
-    <button class="btn-primary" onclick="verificarPin()">Ingresar</button>
-    <button class="btn-secondary" onclick="cerrarPinModal()">Cancelar</button>
+  <div class="pin-box" style="max-width:380px;max-height:85vh;overflow:auto;text-align:left">
+    <div class="pin-title">🔐 Clientes · RavenTechs</div>
+    <div id="admLista" style="font-size:.8rem;margin-bottom:12px">Cargando…</div>
+    <button class="btn-secondary" onclick="exportarCSV()">Exportar CSV</button>
+    <button class="btn-secondary" onclick="cerrarPinModal()">Cerrar</button>
   </div>
 </div>
 
@@ -440,13 +439,14 @@ var __rtPWA = (function() {
 <!-- SCREEN DEMO WALL -->
 <div class="screen" id="screen-demo">
   <div class="demo-icon">⏳</div>
-  <div class="demo-title">Tu período de prueba venció</div>
-  <div class="demo-desc">Para continuar usando EmpresAR contactanos y te activamos la cuenta.</div>
-  <a href="mailto:ventas@raventechsapp.com?subject=Quiero activar EmpresAR&body=Hola, mi período de prueba venció y me interesa continuar." class="btn-contacto">Contactar a ventas</a>
+  <div class="demo-title">Tu prueba gratis terminó</div>
+  <div class="demo-desc">Tus datos están guardados y a salvo. Para seguir usando EmpresAR escribinos por WhatsApp y te activamos la cuenta.</div>
+  <a href="https://wa.me/5491136547592?text=Hola%2C%20mi%20prueba%20de%20EmpresAR%20termin%C3%B3%20y%20quiero%20activarla." target="_blank" rel="noopener" class="btn-contacto">Activar por WhatsApp</a>
 </div>
 
 <!-- SCREEN APP -->
 <div class="screen" id="screen-app">
+  <div id="rtCartel" style="display:none;padding:8px 14px;text-align:center;font-size:.8rem;font-weight:600;color:#fff;background:#2563eb"></div>
 
   <div class="topbar">
     <div class="topbar-logo" id="logoTap">Empres<span>AR</span></div>
@@ -950,39 +950,85 @@ window.quitarPractica = async function() {
 
 // ══════════ FIN BACKUP ══════════
 
-// ── P1: PIN ADMIN (5 toques en logo) ──
+// ── ADMIN (5 toques en logo; sin PIN, solo cuenta admin) ──
 document.getElementById('logoTap').addEventListener('click', () => {
   tapCount++;
   clearTimeout(tapTimer);
   tapTimer = setTimeout(() => tapCount = 0, 2000);
   if (tapCount >= 5) {
     tapCount = 0;
-    document.getElementById('pinModal').classList.add('open');
-    document.getElementById('pinInput').value = '';
-    document.getElementById('pinError').textContent = '';
+    if (window.rtIsAdmin && window.rtIsAdmin()) {
+      document.getElementById('pinModal').classList.add('open');
+      admCargar();
+    }
   }
 });
 
-window.verificarPin = function() {
-  const pin = document.getElementById('pinInput').value;
-  if ((window.rtIsAdmin&&window.rtIsAdmin())) {
-    document.getElementById('pinModal').classList.remove('open');
-    toast('Panel admin RavenTechs', 'ok');
-    // Panel admin: exportar CSV desde acá
-    exportarCSV();
-  } else {
-    document.getElementById('pinError').textContent = 'PIN incorrecto';
-    document.getElementById('pinInput').value = '';
-  }
-};
-
+window.exportarCSV = exportarCSV;
 window.cerrarPinModal = function() {
   document.getElementById('pinModal').classList.remove('open');
 };
 
-document.getElementById('pinInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') window.verificarPin();
-});
+function admEsc(t){ return String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function admEstado(u){
+  if (u.status === 'activo') return '✅ Cliente activo';
+  const e = u.demoExpiry; if (!e) return '🕒 Demo sin fecha';
+  const d = e.toDate ? e.toDate() : new Date(e);
+  const dias = Math.ceil((d - new Date())/86400000);
+  return dias > 0 ? '🕒 Demo: quedan ' + dias + ' día' + (dias===1?'':'s') : '⛔ Demo vencida';
+}
+async function admCargar(){
+  const box = document.getElementById('admLista');
+  box.textContent = 'Cargando…';
+  try {
+    const snap = await getDocs(collection(db, 'usuarios'));
+    const us = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>String(a.email).localeCompare(String(b.email)));
+    if (!us.length) { box.textContent = 'Todavía no hay clientes.'; return; }
+    box.innerHTML = us.map(u => '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">'
+      + '<div style="font-weight:600">' + admEsc(u.nombre || u.email) + '</div>'
+      + '<div style="color:var(--muted);font-size:.72rem">' + admEsc(u.email) + '</div>'
+      + '<div style="margin:6px 0">' + admEstado(u) + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button class="btn-secondary" style="flex:1" data-uid="' + u.id + '" data-dias="7">+7 días</button>'
+      + '<button class="btn-secondary" style="flex:1" data-uid="' + u.id + '" data-dias="30">+30 días</button>'
+      + '<button class="btn-primary" style="flex:1" data-uid="' + u.id + '" data-act="1">Activar</button>'
+      + '</div></div>').join('');
+    box.querySelectorAll('button[data-uid]').forEach(b => b.addEventListener('click', () => admSet(b)));
+  } catch(e) { box.textContent = 'No se pudo cargar: ' + e.message; logError('admCargar', e.message); }
+}
+async function admSet(btn){
+  const ref = doc(db, 'usuarios', btn.dataset.uid);
+  try {
+    if (btn.dataset.act) {
+      await updateDoc(ref, { status: 'activo' });
+      toast('Cliente activado', 'ok');
+    } else {
+      const dias = parseInt(btn.dataset.dias) || 7;
+      const cur = (await getDoc(ref)).data() || {};
+      let base = new Date();
+      const e = cur.demoExpiry && (cur.demoExpiry.toDate ? cur.demoExpiry.toDate() : new Date(cur.demoExpiry));
+      if (e && e > base) base = e;
+      base.setDate(base.getDate() + dias);
+      await updateDoc(ref, { status: 'demo', demoExpiry: base });
+      toast('+' + dias + ' días de demo', 'ok');
+    }
+    admCargar();
+  } catch(e) { toast('No se pudo cambiar', 'danger'); logError('admSet', e.message); }
+}
+
+// ── CARTEL DE DEMO ──
+function pintarCartel(userDoc) {
+  const el = document.getElementById('rtCartel');
+  if (!el) return;
+  if (!userDoc || userDoc.status === 'activo' || !userDoc.demoExpiry) { el.style.display = 'none'; return; }
+  const d = userDoc.demoExpiry.toDate ? userDoc.demoExpiry.toDate() : new Date(userDoc.demoExpiry);
+  const ms = d - new Date();
+  if (ms <= 0) { el.style.display = 'none'; return; }
+  const dias = Math.ceil(ms / 86400000);
+  el.style.display = 'block';
+  el.style.background = ms < 3*86400000 ? '#dc2626' : '#2563eb';
+  el.textContent = '🕒 Prueba gratis: te ' + (dias===1?'queda 1 día':'quedan ' + dias + ' días');
+}
 
 // ── DEMO WALL ──
 function checkDemo(userDoc) {
@@ -1023,14 +1069,18 @@ onAuthStateChanged(auth, async user => {
   // Escuchar cambios en tiempo real del userDoc (para activación desde admin)
   onSnapshot(userRef, snap => {
     const data = snap.data();
+    pintarCartel(data);
     if (data?.status === 'activo') {
       document.getElementById('screen-demo').classList.remove('active');
       document.getElementById('screen-app').classList.add('active');
     } else if (checkDemo(data)) {
       showScreen('screen-demo');
+    } else if (document.getElementById('screen-demo').classList.contains('active')) {
+      location.reload(); // le dieron más días: reabre la app
     }
   });
 
+  pintarCartel(userDoc);
   if (checkDemo(userDoc)) { showScreen('screen-demo'); return; }
 
   // Mostrar app
@@ -1058,7 +1108,7 @@ window.addEventListener('offline', () => actualizarConexion(false));
 
 // ── P3: SW ──
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/Garrafar/sw-empresar.js')
+  navigator.serviceWorker.register('/sw-empresar.js')
     .then(() => console.log('SW EmpresAR registrado'))
     .catch(e => console.warn('SW error:', e));
 }
